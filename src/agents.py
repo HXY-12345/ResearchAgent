@@ -1,77 +1,125 @@
-"""Agent nodes for the research workflow with dependency injection."""
+"""
+深度研究代理系统 - 智能体节点模块
+============================================
 
-import asyncio
+功能：实现四个核心智能体的业务逻辑
+
+智能体列表：
+    1. ResearchPlanner    - 规划研究策略
+    2. ResearchSearcher   - 执行网络搜索
+    3. ResearchSynthesizer - 综合分析信息
+    4. ReportWriter       - 生成研究报告
+
+设计模式：
+    - 依赖注入：每个智能体可接受外部注入的 LLM 实例
+    - 工厂模式：get_llm() 统一创建不同提供商的 LLM
+    - 重试机制：每个智能体内置指数退避重试
+"""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 标准库导入
+# ═══════════════════════════════════════════════════════════════════════════════
+import asyncio       # 异步编程支持
 from typing import List, Optional, Dict, Any, Protocol
-import logging
-import time
-import json
-import re
+import logging       # 日志记录
+import time          # 计时和延迟
+import json          # JSON 解析
+import re            # 正则表达式
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
+# ═══════════════════════════════════════════════════════════════════════════════
+# LangChain 相关导入
+# ═══════════════════════════════════════════════════════════════════════════════
+from langchain_google_genai import ChatGoogleGenerativeAI  # Gemini 模型
+from langchain_ollama import ChatOllama                    # Ollama 本地模型
+from langchain_openai import ChatOpenAI                      # OpenAI 兼容模型
+from langchain_core.prompts import ChatPromptTemplate       # 提示词模板
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
-from langchain_core.language_models import BaseChatModel
-from langchain.agents import create_agent
+from langchain_core.language_models import BaseChatModel    # LLM 基类
+from langchain.agents import create_agent                   # 创建自主智能体
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# 项目内部导入
+# ═══════════════════════════════════════════════════════════════════════════════
 from src.state import ResearchState, ResearchPlan, SearchQuery, ReportSection, SearchResult
-from src.utils.tools import get_research_tools
-from src.config import config
-from src.utils.credibility import CredibilityScorer
-from src.utils.citations import CitationFormatter
-from src.llm_tracker import estimate_tokens
+from src.utils.tools import get_research_tools               # 获取 LangChain 工具
+from src.config import config                                # 全局配置
+from src.utils.credibility import CredibilityScorer         # 可信度评分
+from src.utils.citations import CitationFormatter           # 引用格式化
+from src.llm_tracker import estimate_tokens                 # Token 估算
 from src.exceptions import PlanningError, SearchError, SynthesisError, ReportGenerationError
+
+# 提示词模板（从 prompts 模块导入）
 from src.prompts import (
     PLANNER_SYSTEM_PROMPT, PLANNER_USER_TEMPLATE,
     SEARCHER_SYSTEM_PROMPT, SEARCHER_USER_TEMPLATE,
     SYNTHESIZER_SYSTEM_PROMPT, SYNTHESIZER_USER_TEMPLATE,
     WRITER_SYSTEM_PROMPT, WRITER_USER_TEMPLATE
 )
+
+# 进度回调函数（用于 Web UI 显示）
 from src.callbacks import (
     emit_planning_start, emit_planning_complete,
-    emit_search_start, emit_search_results, 
+    emit_search_start, emit_search_results,
     emit_extraction_start, emit_extraction_complete,
     emit_synthesis_start, emit_synthesis_progress, emit_synthesis_complete,
     emit_writing_start, emit_writing_section, emit_writing_complete,
     emit_error
 )
 
+# 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# LLM Factory
-# =============================================================================
+# ═══════════════════════════════════════════════════════════════════════════════
+# LLM 工厂函数
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def get_llm(
-    temperature: float = 0.7, 
+    temperature: float = 0.7,
     model_override: Optional[str] = None,
     provider_override: Optional[str] = None
 ) -> BaseChatModel:
-    """Get LLM instance based on configuration.
-    
-    Args:
-        temperature: Temperature for the LLM
-        model_override: Optional model name to override config.model_name
-        provider_override: Optional provider to override config.model_provider
-        
-    Returns:
-        LLM instance (ChatOllama, ChatGoogleGenerativeAI, or ChatOpenAI)
     """
+    LLM 工厂函数：根据配置创建 LLM 实例
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    支持的模型提供商：
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | provider    | 模型类型         | 配置来源              |
+    |-------------|-----------------|----------------------|
+    | ollama      | 本地模型         | OLLAMA_BASE_URL     |
+    | openai      | OpenAI/API兼容   | OPENAI_API_KEY      |
+    | llamacpp    | llama.cpp服务器  | LLAMACPP_BASE_URL   |
+    | gemini      | Google Gemini    | GEMINI_API_KEY      |
+
+    Args:
+        temperature: 生成温度（0.0=确定性，1.0=创造性）
+        model_override: 覆盖配置中的模型名称
+        provider_override: 覆盖配置中的提供商
+
+    Returns:
+        BaseChatModel: LangChain 标准接口的 LLM 实例
+    """
+    # 获取模型名称和提供商（支持覆盖）
     model_name = model_override or config.model_name
     provider = provider_override or config.model_provider
-    
+
+    # ═══════════════════════════════════════════════════════════════
+    # 根据提供商创建对应的 LLM 实例
+    # ═══════════════════════════════════════════════════════════════
     if provider == "ollama":
+        # Ollama 本地模型（如 qwen2.5:7b）
         logger.info(f"Using Ollama model: {model_name}")
         return ChatOllama(
             model=model_name,
             base_url=config.ollama_base_url,
             temperature=temperature,
-            num_ctx=8192,
+            num_ctx=8192,  # 上下文窗口大小
         )
+
     elif provider == "openai":
+        # OpenAI 或兼容 API（如 OpenRouter）
         logger.info(f"Using OpenAI model: {model_name}")
         return ChatOpenAI(
             model=model_name,
@@ -79,15 +127,19 @@ def get_llm(
             api_key=config.openai_api_key,
             temperature=temperature
         )
+
     elif provider == "llamacpp":
+        # llama.cpp 服务器（OpenAI 兼容接口）
         logger.info(f"Using llama.cpp server model: {model_name}")
         return ChatOpenAI(
             model=model_name,
             base_url=f"{config.llamacpp_base_url}/v1",
-            api_key="not-needed",
+            api_key="not-needed",  # llama.cpp 不需要 API key
             temperature=temperature
         )
-    else:  # gemini
+
+    else:  # gemini（默认）
+        # Google Gemini
         logger.info(f"Using Gemini model: {model_name}")
         return ChatGoogleGenerativeAI(
             model=model_name,
@@ -96,53 +148,113 @@ def get_llm(
         )
 
 
-# =============================================================================
-# Research Planner Agent
-# =============================================================================
+# ═══════════════════════════════════════════════════════════════════════════════
+# 智能体 1: ResearchPlanner（规划智能体）
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class ResearchPlanner:
-    """Autonomous agent responsible for planning research strategy."""
-    
+    """
+    规划智能体：负责制定研究策略
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    职责：
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    1. 分析研究主题
+    2. 生成 3-5 个研究目标 (objectives)
+    3. 生成针对性的搜索查询 (search_queries)
+    4. 设计报告大纲 (report_outline，最多 8 节)
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    输入/输出：
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    输入: state.research_topic (研究主题)
+    输出: state.plan (ResearchPlan 对象)
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    实现特点：
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    - 使用 JsonOutputParser 要求 LLM 输出结构化 JSON
+    - 内置重试机制（最多 3 次，指数退避）
+    - 验证输出结构的完整性
+    """
+
     def __init__(self, llm: Optional[BaseChatModel] = None, max_retries: int = 3):
-        self.llm = llm or get_llm(temperature=0.7)
+        """
+        初始化规划智能体
+
+        Args:
+            llm: 可选的 LLM 实例（依赖注入，便于测试）
+            max_retries: 最大重试次数
+        """
+        self.llm = llm or get_llm(temperature=0.7)  # 较高温度以获得创意
         self.max_retries = max_retries
-        
+
     async def plan(self, state: ResearchState) -> Dict[str, Any]:
-        """Create a research plan with structured LLM output.
-        
-        Returns dict with updates that LangGraph will merge into state.
+        """
+        执行规划任务
+
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        工作流程：
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        1. 构建提示词（注入配置参数）
+        2. 调用 LLM 生成结构化计划
+        3. 验证输出完整性
+        4. 构建 ResearchPlan 对象
+        5. 返回状态更新（LangGraph 自动合并）
+
+        Args:
+            state: 当前研究状态（包含 research_topic）
+
+        Returns:
+            Dict[str, Any]: 状态更新字典，LangGraph 会自动合并到全局状态
         """
         logger.info(f"Planning research for: {state.research_topic}")
-        
+
+        # 触发进度回调（通知 Web UI）
         await emit_planning_start(state.research_topic)
-        
+
+        # ═══════════════════════════════════════════════════════════════
+        # 步骤 1: 构建提示词
+        # ═══════════════════════════════════════════════════════════════
+        # 从 prompts/planner.py 加载模板，并注入配置参数
         system_prompt = PLANNER_SYSTEM_PROMPT.format(
-            max_queries=config.max_search_queries,
-            max_sections=config.max_report_sections
+            max_queries=config.max_search_queries,      # 如: 3
+            max_sections=config.max_report_sections     # 如: 8
         )
-        
+
+        # 创建 ChatPromptTemplate（system + user 消息）
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             ("human", PLANNER_USER_TEMPLATE)
         ])
-        
+
+        # ═══════════════════════════════════════════════════════════════
+        # 步骤 2: 重试循环（处理 LLM 输出不稳定）
+        # ═══════════════════════════════════════════════════════════════
         for attempt in range(self.max_retries):
             try:
                 start_time = time.time()
+
+                # 构建 LCEL 链: 提示词 -> LLM -> JSON 解析器
                 chain = prompt | self.llm | JsonOutputParser()
-                
+
+                # 估算输入 token 数（用于成本追踪）
                 input_text = f"{state.research_topic} {config.max_search_queries} {config.max_report_sections}"
                 input_tokens = estimate_tokens(input_text)
-                
+
+                # ═════════════════════════════════════════════════════════
+                # 调用 LLM
+                # ═════════════════════════════════════════════════════════
                 result = await chain.ainvoke({
                     "topic": state.research_topic,
                     "max_queries": config.max_search_queries,
                     "max_sections": config.max_report_sections
                 })
-                
+
+                # 记录调用详情
                 duration = time.time() - start_time
                 output_tokens = estimate_tokens(str(result))
-                
+
                 call_detail = {
                     'agent': 'ResearchPlanner',
                     'operation': 'plan',
@@ -152,50 +264,69 @@ class ResearchPlanner:
                     'duration': round(duration, 2),
                     'attempt': attempt + 1
                 }
-                
+
+                # ═════════════════════════════════════════════════════════
+                # 步骤 3: 验证输出结构
+                # ═════════════════════════════════════════════════════════
+                # 检查必需字段是否存在
                 if not all(key in result for key in ["topic", "objectives", "search_queries", "report_outline"]):
                     raise PlanningError("Invalid plan structure returned")
-                
+
+                # 检查搜索查询是否为空
                 if not result["search_queries"]:
                     raise PlanningError("No search queries generated")
-                
+
+                # ═════════════════════════════════════════════════════════
+                # 步骤 4: 构建 ResearchPlan 对象
+                # ═════════════════════════════════════════════════════════
                 plan = ResearchPlan(
                     topic=result["topic"],
-                    objectives=result["objectives"][:5],
+                    objectives=result["objectives"][:5],  # 最多 5 个目标
                     search_queries=[
                         SearchQuery(query=sq["query"], purpose=sq["purpose"])
                         for sq in result["search_queries"][:config.max_search_queries]
                     ],
                     report_outline=result["report_outline"][:config.max_report_sections]
                 )
-                
+
                 logger.info(f"Created plan with {len(plan.search_queries)} queries (max: {config.max_search_queries})")
                 logger.info(f"Report outline has {len(plan.report_outline)} sections (max: {config.max_report_sections})")
-                
+
                 await emit_planning_complete(len(plan.search_queries), len(plan.report_outline))
-                
+
+                # ═════════════════════════════════════════════════════════
+                # 步骤 5: 返回状态更新
+                # ═════════════════════════════════════════════════════════
+                # 注意：只返回需要更新的字段，LangGraph 自动合并
                 return {
-                    "plan": plan,
-                    "current_stage": "searching",
-                    "iterations": state.iterations + 1,
-                    "llm_calls": state.llm_calls + 1,
+                    "plan": plan,                          # 新增: 研究计划
+                    "current_stage": "searching",          # 更新: 进入搜索阶段
+                    "iterations": state.iterations + 1,   # 累加: 迭代计数
+                    "llm_calls": state.llm_calls + 1,     # 累加: LLM 调用次数
                     "total_input_tokens": state.total_input_tokens + input_tokens,
                     "total_output_tokens": state.total_output_tokens + output_tokens,
                     "llm_call_details": state.llm_call_details + [call_detail]
                 }
-                
+
+            # ═══════════════════════════════════════════════════════════════
+            # 异常处理
+            # ═══════════════════════════════════════════════════════════════
             except Exception as e:
                 logger.warning(f"Planning attempt {attempt + 1} failed: {str(e)}")
+
+                # 最后一次尝试失败，返回错误状态
                 if attempt == self.max_retries - 1:
                     logger.error(f"Planning failed after {self.max_retries} attempts")
                     await emit_error(f"Planning failed: {str(e)}")
                     return {
-                        "error": f"Planning failed: {str(e)}",
+                        "error": f"Planning failed: {str(e)}",  # 设置 error 字段会终止工作流
                         "iterations": state.iterations + 1
                     }
                 else:
+                    # 指数退避重试：2^attempt 秒（1s, 2s, 4s...）
                     await asyncio.sleep(2 ** attempt)
-        
+
+        # 理论上不会执行到这里（上面的逻辑已覆盖所有情况）
         return {
             "error": "Planning failed: Maximum retries exceeded",
             "iterations": state.iterations + 1
