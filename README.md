@@ -34,7 +34,6 @@
 <p align="center">
   <img src="./assets/test.png" alt="Research Agent演示" width="500">
 </p>
----
 
 ## 功能特性
 
