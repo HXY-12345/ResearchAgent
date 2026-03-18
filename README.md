@@ -4,162 +4,162 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![LangGraph](https://img.shields.io/badge/LangGraph-0.2.57+-green.svg)](https://github.com/langchain-ai/langgraph)
 
-A production-ready multi-agent autonomous research system built with LangGraph and LangChain. Four specialized agents collaborate to conduct comprehensive research on any topic, generating detailed citation-backed reports with credibility scoring and quality metrics.
+基于 LangGraph 和 LangChain 构建的面向生产环境的多智能体自主研究系统。四个专业智能体协同工作，对任何主题进行深入研究，生成带有引用支持和可信度评分的详细报告。
 
-**Supports:** Local models (Ollama, llama.cpp) and Cloud APIs (Google Gemini, OpenAI)
-
----
-
-## Table of Contents
-
-- [Demo](#demo)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Project Structure](#project-structure)
-- [Key Components](#key-components)
-- [API Reference](#api-reference)
-- [Contributing](#contributing)
-- [License](#license)
+**支持：** 本地模型（Ollama、llama.cpp）和云 API（Google Gemini、OpenAI）
 
 ---
 
-## Demo
+## 目录
+
+- [演示](#演示)
+- [功能特性](#功能特性)
+- [系统架构](#系统架构)
+- [安装](#安装)
+- [使用方法](#使用方法)
+- [配置](#配置)
+- [项目结构](#项目结构)
+- [核心组件](#核心组件)
+- [API 参考](#api-参考)
+- [贡献](#贡献)
+- [许可证](#许可证)
+
+---
+
+## 演示
 
 https://github.com/user-attachments/assets/df8404c6-7423-4a49-864a-bd4d59885c1b
 
-*Watch the full demo video to see the Deep Research Agent in action, showcasing the multi-agent workflow, real-time progress updates, and comprehensive report generation.*
+*观看完整演示视频，了解 Deep Research Agent 的实际运行效果，展示多智能体工作流程、实时进度更新和综合报告生成。*
 
 ---
 
-## Features
+## 功能特性
 
-### Core Capabilities
+### 核心能力
 
-| Feature | Description |
-|---------|-------------|
-| **Multi-Agent Architecture** | Four specialized autonomous agents orchestrated by LangGraph's StateGraph |
-| **Autonomous Research** | Search agent dynamically decides queries, sources, and extraction depth |
-| **Credibility Scoring** | Automatic source evaluation (0-100) based on domain authority |
-| **Quality Validation** | Section-level validation with retry logic and exponential backoff |
-| **Multi-Format Export** | Reports in Markdown, HTML, and plain text |
-| **LLM Usage Tracking** | Real-time monitoring of API calls, tokens, and costs |
-| **Research Caching** | 7-day TTL file-based caching with MD5 topic hashing |
-| **Web Interface** | Interactive Chainlit UI with real-time progress |
+| 功能 | 描述 |
+|------|------|
+| **多智能体架构** | 由 LangGraph 的 StateGraph 编排的四个专业自主智能体 |
+| **自主研究** | 搜索智能体动态决定查询、来源和提取深度 |
+| **可信度评分** | 基于域名权威性的自动来源评估（0-100 分） |
+| **质量验证** | 节级验证，支持重试逻辑和指数退避 |
+| **多格式导出** | 支持 Markdown、HTML 和纯文本格式的报告 |
+| **LLM 使用追踪** | 实时监控 API 调用、token 和成本 |
+| **研究缓存** | 基于文件的研究缓存，7天 TTL，MD5 主题哈希 |
+| **Web 界面** | 交互式 Chainlit UI，实时进度显示 |
 
-### Production-Ready Features
+### 生产级特性
 
-| Feature | Description |
-|---------|-------------|
-| **Circuit Breaker** | Automatic failure detection and recovery for external services |
-| **Connection Pooling** | HTTP/2 with persistent connections via httpx |
-| **Checkpointing** | Workflow state persistence for crash recovery |
-| **Typed Exceptions** | Domain-specific error handling for better debugging |
-| **Dependency Injection** | Testable agent architecture with injectable LLMs |
-| **Search Provider Abstraction** | Extensible search backend (DuckDuckGo, with easy addition of others) |
+| 功能 | 描述 |
+|------|------|
+| **熔断器** | 外部服务的自动故障检测和恢复 |
+| **连接池** | 通过 httpx 实现 HTTP/2 持久连接 |
+| **检查点** | 工作流状态持久化，支持崩溃恢复 |
+| **类型化异常** | 领域特定的错误处理，便于调试 |
+| **依赖注入** | 可注入 LLM 的可测试智能体架构 |
+| **搜索提供商抽象** | 可扩展的搜索后端（DuckDuckGo，易于添加其他） |
 
 ---
 
-## Architecture
+## 系统架构
 
-### High-Level Flow
+### 高级流程
 
 ![Deep Research Agent Flow Diagram](assets/flow.png)
 
-### Agent Responsibilities
+### 智能体职责
 
-#### ResearchPlanner
-- Analyzes research topics and generates 3-5 SMART objectives
-- Creates targeted search queries covering different aspects
-- Designs report outline with up to 8 sections
-- Uses structured JSON output for reliability
+#### ResearchPlanner（研究规划器）
+- 分析研究主题并生成 3-5 个 SMART 目标
+- 创建涵盖不同方面的针对性搜索查询
+- 设计包含最多 8 个章节的报告大纲
+- 使用结构化 JSON 输出确保可靠性
 
-#### ResearchSearcher (Autonomous Agent)
-- LangChain-powered autonomous agent using `create_agent()`
-- Dynamically decides which queries to execute
-- Uses `web_search` and `extract_webpage_content` tools
-- All sources scored for credibility and filtered (default threshold: 40)
-- Circuit breaker protection against service failures
+#### ResearchSearcher（研究搜索器 - 自主智能体）
+- 基于 LangChain 的自主智能体，使用 `create_agent()`
+- 动态决定要执行的查询
+- 使用 `web_search` 和 `extract_webpage_content` 工具
+- 所有来源均进行可信度评分和过滤（默认阈值：40）
+- 针对服务故障的熔断器保护
 
-#### ResearchSynthesizer
-- Analyzes aggregated results with credibility awareness
-- Prioritizes HIGH-credibility sources (score ≥70)
-- Resolves contradictions using credibility hierarchy
-- Progressive truncation handles token limits
+#### ResearchSynthesizer（研究综合器）
+- 以可信度感知方式分析聚合结果
+- 优先考虑高可信度来源（评分 ≥70）
+- 使用可信度层次结构解决矛盾
+- 渐进式截断处理 token 限制
 
-#### ReportWriter
-- Generates structured sections with academic tone
-- Adds proper citations (APA, MLA, Chicago, IEEE)
-- Validates section quality with retry on failure
-- Compiles final markdown with references
+#### ReportWriter（报告撰写器）
+- 以学术语调生成结构化章节
+- 添加正确的引用（APA、MLA、Chicago、IEEE）
+- 验证章节质量，失败时重试
+- 编译包含参考文献的最终 markdown
 
 ---
 
-## Installation
+## 安装
 
-### Prerequisites
+### 前置要求
 
 - Python 3.11+
-- pip or uv package manager
-- One of:
-  - [Ollama](https://ollama.com/) (local models)
-  - [llama.cpp](https://github.com/ggerganov/llama.cpp) (local models, maximum performance)
-  - [Google Gemini API](https://makersuite.google.com/app/apikey) (cloud)
-  - [OpenAI API](https://platform.openai.com/api-keys) (cloud)
+- pip 或 uv 包管理器
+- 以下任一选项：
+  - [Ollama](https://ollama.com/)（本地模型）
+  - [llama.cpp](https://github.com/ggerganov/llama.cpp)（本地模型，最高性能）
+  - [Google Gemini API](https://makersuite.google.com/app/apikey)（云端）
+  - [OpenAI API](https://platform.openai.com/api-keys)（云端）
 
-### Quick Start
+### 快速开始
 
 ```bash
-# Clone the repository
+# 克隆仓库
 git clone https://github.com/tarun7r/deep-research-agent.git
 cd deep-research-agent
 
-# Create virtual environment
+# 创建虚拟环境
 python -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
+# 安装依赖
 pip install -r requirements.txt
 
-# Run
+# 运行
 python main.py
 ```
 
-### Using Ollama (Recommended for Local)
+### 使用 Ollama（推荐用于本地）
 
 ```bash
-# Install Ollama
+# 安装 Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull a model
+# 拉取模型
 ollama pull qwen2.5:7b
 
-# Configure .env
+# 配置 .env
 MODEL_PROVIDER=ollama
 MODEL_NAME=qwen2.5:7b
 SUMMARIZATION_MODEL=qwen2.5:7b
 ```
 
-### Using llama.cpp (Maximum Performance)
+### 使用 llama.cpp（最高性能）
 
 ```bash
-# Download GGUF model
+# 下载 GGUF 模型
 huggingface-cli download Qwen/Qwen2.5-7B-Instruct-GGUF \
   qwen2.5-7b-instruct-q4_k_m.gguf --local-dir ./models
 
-# Start server with tool calling
+# 启动支持工具调用的服务器
 ./llama-server -m ./models/qwen2.5-7b-instruct-q4_k_m.gguf \
   --host 0.0.0.0 --port 8080 -ngl 35 --ctx-size 4096 --jinja
 
-# Configure .env
+# 配置 .env
 MODEL_PROVIDER=llamacpp
 MODEL_NAME=qwen2.5-7b-instruct-q4_k_m
 LLAMACPP_BASE_URL=http://localhost:8080
 ```
 
-### Using Cloud APIs
+### 使用云 API
 
 ```bash
 # Gemini
@@ -175,82 +175,82 @@ MODEL_NAME=gpt-4o-mini
 
 ---
 
-## Usage
+## 使用方法
 
-### Command Line
+### 命令行
 
 ```bash
-# Interactive mode
+# 交互模式
 python main.py
 
-# Direct topic
-python main.py "Impact of quantum computing on cryptography"
+# 直接指定主题
+python main.py "量子计算对密码学的影响"
 ```
 
-### Web Interface
+### Web 界面
 
 ```bash
 chainlit run app.py --host 127.0.0.1 --port 8000
 ```
 
-Features:
-- Real-time progress with stage indicators
-- Quality metrics and LLM usage statistics
-- Multiple format downloads (MD, HTML, TXT)
-- Research history tracking
+功能：
+- 实时进度与阶段指示器
+- 质量指标和 LLM 使用统计
+- 多格式下载（MD、HTML、TXT）
+- 研究历史追踪
 
-### Programmatic API
+### 编程 API
 
 ```python
 import asyncio
 from src.graph import run_research
 
 async def research():
-    # Basic usage
+    # 基本用法
     state = await run_research(
-        topic="Your research topic",
+        topic="您的研究主题",
         verbose=True,
         use_cache=True
     )
-    
-    # Access results
+
+    # 访问结果
     print(state["final_report"])
-    print(f"Sources: {len(state['search_results'])}")
-    print(f"Findings: {len(state['key_findings'])}")
-    print(f"Tokens: {state['total_input_tokens'] + state['total_output_tokens']:,}")
+    print(f"来源数量: {len(state['search_results'])}")
+    print(f"发现数量: {len(state['key_findings'])}")
+    print(f"Token数: {state['total_input_tokens'] + state['total_output_tokens']:,}")
 
 asyncio.run(research())
 ```
 
-### With Persistence (Crash Recovery)
+### 持久化（崩溃恢复）
 
 ```python
 from src.graph import run_research_with_persistence, resume_research
 
-# Run with SQLite persistence
+# 使用 SQLite 持久化运行
 state = await run_research_with_persistence(
-    topic="Your topic",
+    topic="您的研究主题",
     thread_id="my-research-001"
 )
 
-# Resume interrupted workflow
+# 恢复中断的工作流程
 state = await resume_research(thread_id="my-research-001")
 ```
 
 ---
 
-## Configuration
+## 配置
 
-### Environment Variables
+### 环境变量
 
 ```bash
 # =============================================================================
-# MODEL PROVIDER (required)
+# 模型提供商（必需）
 # =============================================================================
-MODEL_PROVIDER=gemini              # Options: ollama, llamacpp, gemini, openai
+MODEL_PROVIDER=gemini              # 选项：ollama、llamacpp、gemini、openai
 
 # =============================================================================
-# PROVIDER-SPECIFIC SETTINGS
+# 提供商特定设置
 # =============================================================================
 
 # Ollama
@@ -269,86 +269,86 @@ SUMMARIZATION_MODEL=gemini-2.5-flash
 
 # OpenAI
 OPENAI_API_KEY=your_api_key_here
-OPENAI_BASE_URL=https://api.openai.com  # Optional
+OPENAI_BASE_URL=https://api.openai.com  # 可选
 MODEL_NAME=gpt-4o-mini
 SUMMARIZATION_MODEL=gpt-4o-mini
 
 # =============================================================================
-# SEARCH SETTINGS (optional)
+# 搜索设置（可选）
 # =============================================================================
-MAX_SEARCH_QUERIES=3               # Number of search queries
-MAX_SEARCH_RESULTS_PER_QUERY=3     # Results per query
-MIN_CREDIBILITY_SCORE=40           # Filter threshold (0-100)
+MAX_SEARCH_QUERIES=3               # 搜索查询数量
+MAX_SEARCH_RESULTS_PER_QUERY=3     # 每个查询的结果数
+MIN_CREDIBILITY_SCORE=40           # 过滤阈值（0-100）
 
 # =============================================================================
-# REPORT SETTINGS (optional)
+# 报告设置（可选）
 # =============================================================================
-MAX_REPORT_SECTIONS=8              # Maximum sections in report
-CITATION_STYLE=apa                 # Options: apa, mla, chicago, ieee
+MAX_REPORT_SECTIONS=8              # 报告最大章节数
+CITATION_STYLE=apa                 # 选项：apa、mla、chicago、ieee
 ```
 
-### Model Provider Comparison
+### 模型提供商对比
 
-| Provider | Cost | Privacy | Speed | Setup |
-|----------|------|---------|-------|-------|
-| **Ollama** | Free | Local | Fast | Easy |
-| **llama.cpp** | Free | Local | Fastest | Manual |
-| **Gemini** | Free tier | Cloud | Fast | API key |
-| **OpenAI** | Pay-per-use | Cloud | Fast | API key |
+| 提供商 | 成本 | 隐私 | 速度 | 设置 |
+|--------|------|------|------|------|
+| **Ollama** | 免费 | 本地 | 快 | 简单 |
+| **llama.cpp** | 免费 | 本地 | 最快 | 手动 |
+| **Gemini** | 免费额度 | 云端 | 快 | API 密钥 |
+| **OpenAI** | 按量付费 | 云端 | 快 | API 密钥 |
 
 ---
 
-## Project Structure
+## 项目结构
 
 ```
 deep-research-agent/
 ├── src/
-│   ├── __init__.py           # Package initialization
-│   ├── config.py             # Configuration management (Pydantic)
-│   ├── state.py              # State models (ResearchState, etc.)
-│   ├── agents.py             # Agent implementations with DI
-│   ├── graph.py              # LangGraph workflow + checkpointing
-│   ├── callbacks.py          # Progress callback system
-│   ├── llm_tracker.py        # Token and cost tracking
-│   ├── exceptions.py         # Typed domain exceptions
+│   ├── __init__.py           # 包初始化
+│   ├── config.py             # 配置管理（Pydantic）
+│   ├── state.py              # 状态模型（ResearchState 等）
+│   ├── agents.py             # 带依赖注入的智能体实现
+│   ├── graph.py              # LangGraph 工作流 + 检查点
+│   ├── callbacks.py          # 进度回调系统
+│   ├── llm_tracker.py        # Token 和成本追踪
+│   ├── exceptions.py         # 类型化领域异常
 │   │
-│   ├── prompts/              # Extracted prompt templates
+│   ├── prompts/              # 提取的提示模板
 │   │   ├── __init__.py
-│   │   ├── planner.py        # Planning prompts
-│   │   ├── searcher.py       # Search prompts
-│   │   ├── synthesizer.py    # Synthesis prompts
-│   │   └── writer.py         # Writing prompts
+│   │   ├── planner.py        # 规划提示
+│   │   ├── searcher.py       # 搜索提示
+│   │   ├── synthesizer.py    # 综合提示
+│   │   └── writer.py         # 撰写提示
 │   │
 │   └── utils/
 │       ├── __init__.py
-│       ├── tools.py          # LangChain @tool functions
-│       ├── web_utils.py      # httpx client, circuit breaker, search providers
-│       ├── cache.py          # Research caching (7-day TTL)
-│       ├── credibility.py    # Source credibility scoring
-│       ├── citations.py      # Citation formatting
-│       ├── exports.py        # Multi-format export
-│       └── history.py        # Research history
+│       ├── tools.py          # LangChain @tool 函数
+│       ├── web_utils.py      # httpx 客户端、熔断器、搜索提供商
+│       ├── cache.py          # 研究缓存（7天 TTL）
+│       ├── credibility.py    # 来源可信度评分
+│       ├── citations.py      # 引用格式化
+│       ├── exports.py        # 多格式导出
+│       └── history.py        # 研究历史
 │
-├── outputs/                  # Generated reports
+├── outputs/                  # 生成的报告
 ├── .cache/
-│   ├── research/             # Cached results
-│   ├── checkpoints/          # Workflow checkpoints (SQLite)
+│   ├── research/             # 缓存结果
+│   ├── checkpoints/          # 工作流检查点（SQLite）
 │   └── research_history.json
 │
-├── assets/                   # Documentation assets
-├── main.py                   # CLI entry point
-├── app.py                    # Chainlit web interface
-├── requirements.txt          # Dependencies
-├── pyproject.toml            # Project metadata
-├── LICENSE                   # MIT License
+├── assets/                   # 文档资源
+├── main.py                   # CLI 入口点
+├── app.py                    # Chainlit Web 界面
+├── requirements.txt          # 依赖
+├── pyproject.toml            # 项目元数据
+├── LICENSE                   # MIT 许可证
 └── README.md
 ```
 
 ---
 
-## Key Components
+## 核心组件
 
-### Exception Hierarchy
+### 异常层次结构
 
 ```python
 DeepResearchError
@@ -363,36 +363,36 @@ DeepResearchError
 └── LLMError
 ```
 
-### Credibility Scoring
+### 可信度评分
 
-Sources are scored (0-100) based on:
+来源基于以下因素评分（0-100）：
 
-| Factor | Points |
-|--------|--------|
-| Trusted domain (.edu, .gov, academic) | +30 |
-| HTTPS enabled | +5 |
-| Academic/research path | +10 |
-| Suspicious TLD (.xyz, .tk) | -20 |
-| No HTTPS | -10 |
+| 因素 | 分数 |
+|------|------|
+| 受信任的域名（.edu、.gov、学术） | +30 |
+| 启用 HTTPS | +5 |
+| 学术/研究路径 | +10 |
+| 可疑的 TLD（.xyz、.tk） | -20 |
+| 无 HTTPS | -10 |
 
-Default filter threshold: 40 (configurable via `MIN_CREDIBILITY_SCORE`)
+默认过滤阈值：40（可通过 `MIN_CREDIBILITY_SCORE` 配置）
 
-### Circuit Breaker States
+### 熔断器状态
 
 ```
-CLOSED ──► (5 failures) ──► OPEN ──► (30s timeout) ──► HALF_OPEN ──► (success) ──► CLOSED
+CLOSED ──► (5 次失败) ──► OPEN ──► (30s 超时) ──► HALF_OPEN ──► (成功) ──► CLOSED
                               │                            │
-                              └──────── (failure) ◄────────┘
+                              └──────── (失败) ◄────────┘
 ```
 
 ---
 
-## API Reference
+## API 参考
 
-### Core Functions
+### 核心函数
 
 ```python
-# Main research function
+# 主要研究函数
 async def run_research(
     topic: str,
     verbose: bool = True,
@@ -401,7 +401,7 @@ async def run_research(
     thread_id: Optional[str] = None
 ) -> Dict[str, Any]
 
-# With SQLite persistence
+# 使用 SQLite 持久化
 async def run_research_with_persistence(
     topic: str,
     verbose: bool = True,
@@ -409,20 +409,20 @@ async def run_research_with_persistence(
     thread_id: Optional[str] = None
 ) -> Dict[str, Any]
 
-# Resume interrupted workflow
+# 恢复中断的工作流程
 async def resume_research(
     thread_id: str,
     additional_input: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]
 
-# Check workflow state
+# 检查工作流程状态
 async def get_workflow_state(thread_id: str) -> Optional[Dict[str, Any]]
 
-# List saved threads
+# 列出已保存的线程
 def list_research_threads() -> List[str]
 ```
 
-### Response Structure
+### 响应结构
 
 ```python
 {
@@ -445,54 +445,54 @@ def list_research_threads() -> List[str]
 
 ---
 
-## Output Format
+## 输出格式
 
-Reports follow this structure:
+报告遵循以下结构：
 
 ```markdown
-# [Research Topic]
+# [研究主题]
 
-**Deep Research Report**
+**深度研究报告**
 
-## Executive Summary
-[Overview with source count and section count]
+## 执行摘要
+[概述，包含来源数量和章节数量]
 
-## Research Objectives
-1. [Objective 1]
-2. [Objective 2]
+## 研究目标
+1. [目标 1]
+2. [目标 2]
 ...
 
 ---
 
-## [Section 1 Title]
-[Content with inline citations [1], [2]]
+## [章节 1 标题]
+[内容，包含内联引用 [1]、[2]]
 
-## [Section 2 Title]
-[Content with inline citations [3], [4]]
+## [章节 2 标题]
+[内容，包含内联引用 [3]、[4]]
 
 ---
 
-## References
-1. [Formatted citation - APA/MLA/Chicago/IEEE]
-2. [Formatted citation]
+## 参考文献
+1. [格式化引用 - APA/MLA/Chicago/IEEE]
+2. [格式化引用]
 ...
 
 ---
 
-**Note:** X high-credibility sources were prioritized.
+**注意：** 优先考虑了 X 个高可信度来源。
 ```
 
 ---
 
-## Development
+## 开发
 
-### Running Tests
+### 运行测试
 
 ```bash
 pytest tests/ -v
 ```
 
-### Adding a New Search Provider
+### 添加新的搜索提供商
 
 ```python
 # src/utils/web_utils.py
@@ -500,62 +500,55 @@ class GoogleSearchProvider(SearchProvider):
     @property
     def name(self) -> str:
         return "google"
-    
+
     async def search(self, query: str, max_results: int) -> List[SearchResult]:
-        # Implementation
+        # 实现
         pass
 
-# Register in WebSearchTool
+# 在 WebSearchTool 中注册
 tool = WebSearchTool(providers=[
     DuckDuckGoProvider(),
-    GoogleSearchProvider()  # Fallback
+    GoogleSearchProvider()  # 备用
 ])
 ```
 
-### Customizing Prompts
+### 自定义提示
 
-Edit files in `src/prompts/`:
-- `planner.py` - Research planning strategy
-- `searcher.py` - Search agent instructions
-- `synthesizer.py` - Synthesis methodology
-- `writer.py` - Report writing style
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+编辑 `src/prompts/` 中的文件：
+- `planner.py` - 研究规划策略
+- `searcher.py` - 搜索智能体指令
+- `synthesizer.py` - 综合方法论
+- `writer.py` - 报告撰写风格
 
 ---
 
-## License
+## 贡献
 
-MIT License - See [LICENSE](LICENSE) file for details.
-
----
-
-## Acknowledgments
-
-Built with:
-- [LangGraph](https://github.com/langchain-ai/langgraph) - Workflow orchestration
-- [LangChain](https://github.com/langchain-ai/langchain) - LLM framework
-- [Chainlit](https://github.com/Chainlit/chainlit) - Web interface
-- [httpx](https://www.python-httpx.org/) - Async HTTP client
-- [DuckDuckGo](https://duckduckgo.com/) - Web search
-
-Supports:
-- [Ollama](https://ollama.com/) & [llama.cpp](https://github.com/ggerganov/llama.cpp) - Local models
-- [Google Gemini](https://ai.google.dev/) & [OpenAI](https://openai.com/) - Cloud APIs
+1. Fork 本仓库
+2. 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 提交更改（`git commit -m 'Add amazing feature'`）
+4. 推送到分支（`git push origin feature/amazing-feature`）
+5. 打开 Pull Request
 
 ---
 
-## Contact
+## 许可证
 
-- **GitHub**: [tarun7r](https://github.com/tarun7r)
-- **LinkedIn**: [Tarun Sai Goddu](https://www.linkedin.com/in/tarunsaigoddu/)
-- **Hugging Face**: [tarun7r](https://huggingface.co/tarun7r)
-- **Email**: tarunsaiaa@gmail.com
+MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+
+---
+
+## 致谢
+
+构建于：
+- [LangGraph](https://github.com/langchain-ai/langgraph) - 工作流编排
+- [LangChain](https://github.com/langchain-ai/langchain) - LLM 框架
+- [Chainlit](https://github.com/Chainlit/chainlit) - Web 界面
+- [httpx](https://www.python-httpx.org/) - 异步 HTTP 客户端
+- [DuckDuckGo](https://duckduckgo.com/) - 网页搜索
+
+支持：
+- [Ollama](https://ollama.com/) & [llama.cpp](https://github.com/ggerganov/llama.cpp) - 本地模型
+- [Google Gemini](https://ai.google.dev/) & [OpenAI](https://openai.com/) - 云 API
+
+---
